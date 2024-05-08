@@ -1,0 +1,29 @@
+{
+    "files": [
+        "src/",
+        "resources/"
+    ],
+    "scripts": {
+        "start": "parcel serve src/index.html",
+        "build": "cross-env NODE_ENV=production parcel build src/index.html --public-url .",
+        "deploy": "gh-pages -d dist"
+    },
+    "devDependencies": {
+        "cross-env": "^5.2.0",
+        "fs": "^0.0.1-security",
+        "gh-pages": "^1.2.0",
+        "gl-matrix": "^3.4.3",
+        "parcel-bundler": "^1.9.7",
+        "parcel-plugin-static-files-copy": "^2.6.0",
+        "typescript": "^2.9.2"
+    },
+    "staticFiles": {
+        "staticPath": [
+            {
+                "staticPath": "resources",
+                "staticOutDir": "resources"
+            }
+        ],
+        "watcherGlob": "**/*.*"
+    }
+}
