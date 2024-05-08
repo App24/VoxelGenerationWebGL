@@ -6,6 +6,9 @@ import { Camera } from "./Camera";
 import { Texture } from "./Texture";
 import { keyboard } from "./Keyboard";
 import { Key } from "ts-key-enum";
+import Chunk, { CHUNK_D, CHUNK_H, CHUNK_W } from "./Chunk";
+import { createMesh, generateChunkMesh } from "./MeshGenerator";
+import { World } from "./World";
 
 export let gl: WebGL2RenderingContext;
 
@@ -136,6 +139,50 @@ export let gl: WebGL2RenderingContext;
         0.0, 1.0   // Bottom-right
     ];
 
+    const chunkShader = new ShaderProgram("resources/shaders/chunk.vs", "resources/shaders/chunk.fs");
+
+    const chunk = new Chunk();
+    chunk.position = [0, 0, 0];
+
+    const chunk2 = new Chunk();
+    chunk2.position = [1, 0, 0];
+
+    const world = new World();
+    world.chunks.push(chunk);
+    world.chunks.push(chunk2);
+
+    const chunksMeshData = createMesh(world);
+
+    const chunkRendering: { vao: WebGLVertexArrayObject, vbo: BufferObject, vboNormals: BufferObject, ebo: BufferObject, position: vec3, indicesCount: number }[] = [];
+
+    chunksMeshData.forEach(chunkMeshData => {
+        const chunkVerticesArray = new Float32Array(chunkMeshData.vertices);
+        const chunkIndicesArray = new Int32Array(chunkMeshData.indices);
+        const chunkNormalsArray = new Float32Array(chunkMeshData.normals);
+
+        const chunkVao = gl.createVertexArray();
+        const chunkVbo = new BufferObject(gl.ARRAY_BUFFER);
+        const chunkVboNormals = new BufferObject(gl.ARRAY_BUFFER);
+        const chunkEbo = new BufferObject(gl.ELEMENT_ARRAY_BUFFER);
+
+        gl.bindVertexArray(chunkVao);
+        chunkVbo.setData(chunkVerticesArray, gl.STATIC_DRAW);
+        chunkVbo.bind();
+        gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(0);
+        chunkVbo.unbind();
+
+        chunkVboNormals.setData(chunkNormalsArray, gl.STATIC_DRAW);
+        chunkVboNormals.bind();
+        gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(1);
+        chunkVboNormals.unbind();
+
+        chunkEbo.setData(chunkIndicesArray, gl.STATIC_DRAW);
+
+        chunkRendering.push({ vao: chunkVao, vbo: chunkVbo, vboNormals: chunkVboNormals, ebo: chunkEbo, position: chunkMeshData.chunk.position, indicesCount: chunkMeshData.indices.length });
+    });
+
     const verticesArray = new Float32Array(verticesData);
     const indicesArray = new Int32Array(indices);
     const normalsArray = new Float32Array(normals);
@@ -185,6 +232,7 @@ export let gl: WebGL2RenderingContext;
         projectionMatrix = mat4.perspective(projectionMatrix, toRadians(60), canvas.clientWidth / canvas.clientHeight, 0.1, 100);
         program.setMatrix4fv("projectionMatrix", projectionMatrix);
         program2.setMatrix4fv("projectionMatrix", projectionMatrix);
+        chunkShader.setMatrix4fv("projectionMatrix", projectionMatrix);
     });
 
     let modelMatrix = mat4.create();
@@ -195,15 +243,17 @@ export let gl: WebGL2RenderingContext;
 
     program.setMatrix4fv("projectionMatrix", projectionMatrix);
     program2.setMatrix4fv("projectionMatrix", projectionMatrix);
+    chunkShader.setMatrix4fv("projectionMatrix", projectionMatrix);
     program.setMatrix4fv("modelMatrix", modelMatrix);
 
     const lightColor = vec3.fromValues(1, 1, 1);
 
     program.setVec3("objectColor", [1, .8, .3]);
+    chunkShader.setVec3("objectColor", [1, 1, 1]);
     program.setVec3("lightColor", lightColor);
+    chunkShader.setVec3("lightColor", lightColor);
     program2.setVec3("lightColor", lightColor);
-    program.setVec3("viewPos", camera.position);
-    program.setVec3("lightPos", [5, 1, 2]);
+    chunkShader.setVec3("lightPos", [5, 20, 18]);
 
     program.setFloat("specularStrength", 0.25);
     const delta = 60 / 1000;
@@ -218,6 +268,9 @@ export let gl: WebGL2RenderingContext;
         program.setMatrix4fv("modelMatrix", modelMatrix);
         program.setMatrix4fv("viewMatrix", camera.viewMatrix);
         program2.setMatrix4fv("viewMatrix", camera.viewMatrix);
+        program.setVec3("viewPos", camera.position);
+        chunkShader.setVec3("viewPos", camera.position);
+        chunkShader.setMatrix4fv("viewMatrix", camera.viewMatrix);
 
         angle += 5 * delta;
 
@@ -226,6 +279,16 @@ export let gl: WebGL2RenderingContext;
         lightPos = [5 * Math.sin(toRadians(angle)), 5 * Math.cos(toRadians(angle)), 5 * Math.sin(toRadians(angle / 2)) - 10];
 
         program.setVec3("lightPos", lightPos);
+
+        chunkRendering.forEach(chunkData => {
+            const chunkModelMatrix = mat4.create();
+            mat4.translate(chunkModelMatrix, chunkModelMatrix, vec3.mul(vec3.create(), [CHUNK_W / 2, CHUNK_H / 2, CHUNK_D / 2], chunkData.position));
+            chunkShader.setMatrix4fv("modelMatrix", chunkModelMatrix);
+            chunkShader.use();
+            gl.bindVertexArray(chunkData.vao);
+            chunkData.ebo.bind();
+            gl.drawElements(gl.TRIANGLES, chunkData.indicesCount, gl.UNSIGNED_INT, 0);
+        });
 
         program.use();
         gl.bindVertexArray(vao);
@@ -260,6 +323,12 @@ export let gl: WebGL2RenderingContext;
             movement[1] = -2;
         }
 
+        if (keyboard.isKeyDown("q")) {
+            camera.yaw -= 20 * delta;
+        } else if (keyboard.isKeyDown("e")) {
+            camera.yaw += 20 * delta;
+        }
+
         movement = vec3.normalize(movement, movement);
         camera.position = vec3.add(vec3.create(), camera.position, vec3.multiply(vec3.create(), movement, [delta, delta, delta]));
     }
@@ -271,6 +340,13 @@ export let gl: WebGL2RenderingContext;
         indicesBuffer.delete();
         normalsBuffer.delete();
         texture.delete();
+        chunkShader.delete();
+        chunkRendering.forEach(chunkData => {
+            chunkData.vbo.delete();
+            chunkData.ebo.delete();
+            chunkData.vboNormals.delete();
+            gl.deleteVertexArray(chunkData.vao);
+        });
         gl.deleteVertexArray(vao);
     }
 })();
