@@ -9089,9 +9089,227 @@ var Key;
     Key["Separator"] = "Separator";
 })(Key = exports.Key || (exports.Key = {}));
 
-},{}],"index.ts":[function(require,module,exports) {
+},{}],"Chunk.ts":[function(require,module,exports) {
 "use strict";
 
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.CHUNK_W = 16;
+exports.CHUNK_H = 16;
+exports.CHUNK_D = 16;
+var Chunk = /** @class */function () {
+  function Chunk() {
+    this.position = [0, 0, 0];
+    this.voxels = new Array(exports.CHUNK_W * exports.CHUNK_H * exports.CHUNK_D).fill(0);
+    for (var y = 0; y < 10; y++) {
+      for (var z = 0; z < exports.CHUNK_D; z++) {
+        for (var x = 0; x < exports.CHUNK_W; x++) {
+          if (y == 9) this.voxels[z * exports.CHUNK_W * exports.CHUNK_H + y * exports.CHUNK_W + x] = 3;else if (y >= 6) this.voxels[z * exports.CHUNK_W * exports.CHUNK_H + y * exports.CHUNK_W + x] = 2;else this.voxels[z * exports.CHUNK_W * exports.CHUNK_H + y * exports.CHUNK_W + x] = 1;
+        }
+      }
+    }
+    this.voxels[5 * exports.CHUNK_W * exports.CHUNK_H + 10 * exports.CHUNK_W + 4] = 3;
+  }
+  Chunk.prototype.getVoxel = function (x, y, z) {
+    if (x < 0 || x >= exports.CHUNK_W || y < 0 || z < 0 || y >= exports.CHUNK_H || z >= exports.CHUNK_D) return 0;
+    return this.voxels[z * exports.CHUNK_W * exports.CHUNK_H + y * exports.CHUNK_W + x];
+  };
+  return Chunk;
+}();
+exports.default = Chunk;
+},{}],"MeshGenerator.ts":[function(require,module,exports) {
+"use strict";
+
+var __assign = this && this.__assign || Object.assign || function (t) {
+  for (var s, i = 1, n = arguments.length; i < n; i++) {
+    s = arguments[i];
+    for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p)) t[p] = s[p];
+  }
+  return t;
+};
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+var gl_matrix_1 = require("gl-matrix");
+var Chunk_1 = require("./Chunk");
+function hasVoxel(world, chunk, x, y, z) {
+  if (x < 0 || x >= Chunk_1.CHUNK_W || y < 0 || z < 0 || y >= Chunk_1.CHUNK_H || z >= Chunk_1.CHUNK_D) {
+    var sidePos = gl_matrix_1.vec3.create();
+    sidePos[0] = x < 0 ? -1 : x >= Chunk_1.CHUNK_W ? 1 : 0;
+    sidePos[1] = y < 0 ? -1 : y >= Chunk_1.CHUNK_H ? 1 : 0;
+    sidePos[2] = z < 0 ? -1 : z >= Chunk_1.CHUNK_D ? 1 : 0;
+    var sideChunk = world.getChunkVec(gl_matrix_1.vec3.add(gl_matrix_1.vec3.create(), chunk.position, sidePos));
+    if (!sideChunk) return false;
+    if (sidePos[0] == -1) x += Chunk_1.CHUNK_W;else if (sidePos[0] == 1) x -= Chunk_1.CHUNK_W;
+    if (sidePos[1] == -1) y += Chunk_1.CHUNK_H;else if (sidePos[1] == 1) y -= Chunk_1.CHUNK_H;
+    if (sidePos[2] == -1) z += Chunk_1.CHUNK_D;else if (sidePos[2] == 1) z -= Chunk_1.CHUNK_D;
+    return hasVoxel(world, sideChunk, x, y, z);
+  }
+  return chunk.getVoxel(x, y, z) != 0;
+}
+function generateChunkMesh(world, chunk) {
+  var vertices = [];
+  var normals = [];
+  var indices = [];
+  for (var y = 0; y < Chunk_1.CHUNK_H; y++) {
+    for (var z = 0; z < Chunk_1.CHUNK_D; z++) {
+      for (var x = 0; x < Chunk_1.CHUNK_W; x++) {
+        if (chunk.getVoxel(x, y, z) == 0) continue;
+        if (!hasVoxel(world, chunk, x, y + 1, z)) {
+          var startI = vertices.length / 3;
+          vertices.push(x + 0.5, y + 0.5, z + 0.5); // 0
+          vertices.push(x + 0.5, y + 0.5, z - 0.5); // 1
+          vertices.push(x - 0.5, y + 0.5, z + 0.5); // 2
+          vertices.push(x - 0.5, y + 0.5, z - 0.5); // 3
+          indices.push(startI);
+          indices.push(startI + 1);
+          indices.push(startI + 2);
+          indices.push(startI + 1);
+          indices.push(startI + 3);
+          indices.push(startI + 2);
+          normals.push(0, 1, 0);
+          normals.push(0, 1, 0);
+          normals.push(0, 1, 0);
+          normals.push(0, 1, 0);
+        }
+        if (!hasVoxel(world, chunk, x, y - 1, z)) {
+          var startI = vertices.length / 3;
+          vertices.push(x - 0.5, y - 0.5, z + 0.5); // 0
+          vertices.push(x + 0.5, y - 0.5, z - 0.5); // 1
+          vertices.push(x + 0.5, y - 0.5, z + 0.5); // 2
+          vertices.push(x - 0.5, y - 0.5, z - 0.5); // 3
+          indices.push(startI);
+          indices.push(startI + 1);
+          indices.push(startI + 2);
+          indices.push(startI);
+          indices.push(startI + 3);
+          indices.push(startI + 1);
+          normals.push(0, -1, 0);
+          normals.push(0, -1, 0);
+          normals.push(0, -1, 0);
+          normals.push(0, -1, 0);
+        }
+        if (!hasVoxel(world, chunk, x - 1, y, z)) {
+          var startI = vertices.length / 3;
+          vertices.push(x - 0.5, y + 0.5, z + 0.5); // 0
+          vertices.push(x - 0.5, y + 0.5, z - 0.5); // 1
+          vertices.push(x - 0.5, y - 0.5, z + 0.5); // 2
+          vertices.push(x - 0.5, y - 0.5, z - 0.5); // 3
+          indices.push(startI);
+          indices.push(startI + 1);
+          indices.push(startI + 2);
+          indices.push(startI + 1);
+          indices.push(startI + 3);
+          indices.push(startI + 2);
+          normals.push(-1, 0, 0);
+          normals.push(-1, 0, 0);
+          normals.push(-1, 0, 0);
+          normals.push(-1, 0, 0);
+        }
+        if (!hasVoxel(world, chunk, x + 1, y, z)) {
+          var startI = vertices.length / 3;
+          vertices.push(x + 0.5, y - 0.5, z + 0.5); // 0
+          vertices.push(x + 0.5, y + 0.5, z - 0.5); // 1
+          vertices.push(x + 0.5, y + 0.5, z + 0.5); // 2
+          vertices.push(x + 0.5, y - 0.5, z - 0.5); // 3
+          indices.push(startI);
+          indices.push(startI + 1);
+          indices.push(startI + 2);
+          indices.push(startI);
+          indices.push(startI + 3);
+          indices.push(startI + 1);
+          normals.push(1, 0, 0);
+          normals.push(1, 0, 0);
+          normals.push(1, 0, 0);
+          normals.push(1, 0, 0);
+        }
+        if (!hasVoxel(world, chunk, x, y, z - 1)) {
+          var startI = vertices.length / 3;
+          vertices.push(x + 0.5, y + 0.5, z - 0.5);
+          vertices.push(x + 0.5, y - 0.5, z - 0.5);
+          vertices.push(x - 0.5, y + 0.5, z - 0.5);
+          vertices.push(x - 0.5, y - 0.5, z - 0.5);
+          indices.push(startI);
+          indices.push(startI + 1);
+          indices.push(startI + 2);
+          indices.push(startI + 1);
+          indices.push(startI + 3);
+          indices.push(startI + 2);
+          normals.push(0, 0, -1);
+          normals.push(0, 0, -1);
+          normals.push(0, 0, -1);
+          normals.push(0, 0, -1);
+        }
+        if (!hasVoxel(world, chunk, x, y, z + 1)) {
+          var startI = vertices.length / 3;
+          vertices.push(x - 0.5, y + 0.5, z + 0.5);
+          vertices.push(x + 0.5, y - 0.5, z + 0.5);
+          vertices.push(x + 0.5, y + 0.5, z + 0.5);
+          vertices.push(x - 0.5, y - 0.5, z + 0.5);
+          indices.push(startI);
+          indices.push(startI + 1);
+          indices.push(startI + 2);
+          indices.push(startI);
+          indices.push(startI + 3);
+          indices.push(startI + 1);
+          normals.push(0, 0, 1);
+          normals.push(0, 0, 1);
+          normals.push(0, 0, 1);
+          normals.push(0, 0, 1);
+        }
+      }
+    }
+  }
+  return {
+    vertices: vertices,
+    normals: normals,
+    indices: indices
+  };
+}
+exports.generateChunkMesh = generateChunkMesh;
+function createMesh(world) {
+  var meshes = [];
+  world.chunks.forEach(function (chunk) {
+    meshes.push(__assign({}, generateChunkMesh(world, chunk), {
+      chunk: chunk
+    }));
+  });
+  return meshes;
+}
+exports.createMesh = createMesh;
+},{"gl-matrix":"../node_modules/gl-matrix/esm/index.js","./Chunk":"Chunk.ts"}],"World.ts":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+var gl_matrix_1 = require("gl-matrix");
+var World = /** @class */function () {
+  function World() {
+    this.chunks = [];
+  }
+  World.prototype.getChunk = function (x, y, z) {
+    return this.chunks.find(function (c) {
+      return gl_matrix_1.vec3.equals(c.position, [x, y, z]);
+    });
+  };
+  World.prototype.getChunkVec = function (pos) {
+    return this.getChunk(pos[0], pos[1], pos[2]);
+  };
+  return World;
+}();
+exports.World = World;
+},{"gl-matrix":"../node_modules/gl-matrix/esm/index.js"}],"index.ts":[function(require,module,exports) {
+"use strict";
+
+var __importStar = this && this.__importStar || function (mod) {
+  if (mod && mod.__esModule) return mod;
+  var result = {};
+  if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
+  result["default"] = mod;
+  return result;
+};
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
@@ -9103,6 +9321,9 @@ var Camera_1 = require("./Camera");
 var Texture_1 = require("./Texture");
 var Keyboard_1 = require("./Keyboard");
 var ts_key_enum_1 = require("ts-key-enum");
+var Chunk_1 = __importStar(require("./Chunk"));
+var MeshGenerator_1 = require("./MeshGenerator");
+var World_1 = require("./World");
 (function () {
   var canvas = document.createElement("canvas");
   canvas.width = window.innerWidth;
@@ -9163,6 +9384,45 @@ var ts_key_enum_1 = require("ts-key-enum");
   // Bottom face
   0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0 // Bottom-right
   ];
+  var chunkShader = new ShaderProgram_1.ShaderProgram("resources/shaders/chunk.vs", "resources/shaders/chunk.fs");
+  var chunk = new Chunk_1.default();
+  chunk.position = [0, 0, 0];
+  var chunk2 = new Chunk_1.default();
+  chunk2.position = [1, 0, 0];
+  var world = new World_1.World();
+  world.chunks.push(chunk);
+  world.chunks.push(chunk2);
+  var chunksMeshData = MeshGenerator_1.createMesh(world);
+  var chunkRendering = [];
+  chunksMeshData.forEach(function (chunkMeshData) {
+    var chunkVerticesArray = new Float32Array(chunkMeshData.vertices);
+    var chunkIndicesArray = new Int32Array(chunkMeshData.indices);
+    var chunkNormalsArray = new Float32Array(chunkMeshData.normals);
+    var chunkVao = exports.gl.createVertexArray();
+    var chunkVbo = new BufferObject_1.BufferObject(exports.gl.ARRAY_BUFFER);
+    var chunkVboNormals = new BufferObject_1.BufferObject(exports.gl.ARRAY_BUFFER);
+    var chunkEbo = new BufferObject_1.BufferObject(exports.gl.ELEMENT_ARRAY_BUFFER);
+    exports.gl.bindVertexArray(chunkVao);
+    chunkVbo.setData(chunkVerticesArray, exports.gl.STATIC_DRAW);
+    chunkVbo.bind();
+    exports.gl.vertexAttribPointer(0, 3, exports.gl.FLOAT, false, 0, 0);
+    exports.gl.enableVertexAttribArray(0);
+    chunkVbo.unbind();
+    chunkVboNormals.setData(chunkNormalsArray, exports.gl.STATIC_DRAW);
+    chunkVboNormals.bind();
+    exports.gl.vertexAttribPointer(1, 3, exports.gl.FLOAT, false, 0, 0);
+    exports.gl.enableVertexAttribArray(1);
+    chunkVboNormals.unbind();
+    chunkEbo.setData(chunkIndicesArray, exports.gl.STATIC_DRAW);
+    chunkRendering.push({
+      vao: chunkVao,
+      vbo: chunkVbo,
+      vboNormals: chunkVboNormals,
+      ebo: chunkEbo,
+      position: chunkMeshData.chunk.position,
+      indicesCount: chunkMeshData.indices.length
+    });
+  });
   var verticesArray = new Float32Array(verticesData);
   var indicesArray = new Int32Array(indices);
   var normalsArray = new Float32Array(normals);
@@ -9202,6 +9462,7 @@ var ts_key_enum_1 = require("ts-key-enum");
     projectionMatrix = gl_matrix_1.mat4.perspective(projectionMatrix, MathUtilities_1.toRadians(60), canvas.clientWidth / canvas.clientHeight, 0.1, 100);
     program.setMatrix4fv("projectionMatrix", projectionMatrix);
     program2.setMatrix4fv("projectionMatrix", projectionMatrix);
+    chunkShader.setMatrix4fv("projectionMatrix", projectionMatrix);
   });
   var modelMatrix = gl_matrix_1.mat4.create();
   modelMatrix = gl_matrix_1.mat4.translate(modelMatrix, modelMatrix, [0, 0, -10]);
@@ -9209,13 +9470,15 @@ var ts_key_enum_1 = require("ts-key-enum");
   var camera = new Camera_1.Camera();
   program.setMatrix4fv("projectionMatrix", projectionMatrix);
   program2.setMatrix4fv("projectionMatrix", projectionMatrix);
+  chunkShader.setMatrix4fv("projectionMatrix", projectionMatrix);
   program.setMatrix4fv("modelMatrix", modelMatrix);
   var lightColor = gl_matrix_1.vec3.fromValues(1, 1, 1);
   program.setVec3("objectColor", [1, .8, .3]);
+  chunkShader.setVec3("objectColor", [1, 1, 1]);
   program.setVec3("lightColor", lightColor);
+  chunkShader.setVec3("lightColor", lightColor);
   program2.setVec3("lightColor", lightColor);
-  program.setVec3("viewPos", camera.position);
-  program.setVec3("lightPos", [5, 1, 2]);
+  chunkShader.setVec3("lightPos", [5, 20, 18]);
   program.setFloat("specularStrength", 0.25);
   var delta = 60 / 1000;
   var angle = 0;
@@ -9226,10 +9489,22 @@ var ts_key_enum_1 = require("ts-key-enum");
     program.setMatrix4fv("modelMatrix", modelMatrix);
     program.setMatrix4fv("viewMatrix", camera.viewMatrix);
     program2.setMatrix4fv("viewMatrix", camera.viewMatrix);
+    program.setVec3("viewPos", camera.position);
+    chunkShader.setVec3("viewPos", camera.position);
+    chunkShader.setMatrix4fv("viewMatrix", camera.viewMatrix);
     angle += 5 * delta;
     angle = angle % 360;
     lightPos = [5 * Math.sin(MathUtilities_1.toRadians(angle)), 5 * Math.cos(MathUtilities_1.toRadians(angle)), 5 * Math.sin(MathUtilities_1.toRadians(angle / 2)) - 10];
     program.setVec3("lightPos", lightPos);
+    chunkRendering.forEach(function (chunkData) {
+      var chunkModelMatrix = gl_matrix_1.mat4.create();
+      gl_matrix_1.mat4.translate(chunkModelMatrix, chunkModelMatrix, gl_matrix_1.vec3.mul(gl_matrix_1.vec3.create(), [Chunk_1.CHUNK_W / 2, Chunk_1.CHUNK_H / 2, Chunk_1.CHUNK_D / 2], chunkData.position));
+      chunkShader.setMatrix4fv("modelMatrix", chunkModelMatrix);
+      chunkShader.use();
+      exports.gl.bindVertexArray(chunkData.vao);
+      chunkData.ebo.bind();
+      exports.gl.drawElements(exports.gl.TRIANGLES, chunkData.indicesCount, exports.gl.UNSIGNED_INT, 0);
+    });
     program.use();
     exports.gl.bindVertexArray(vao);
     indicesBuffer.bind();
@@ -9257,6 +9532,11 @@ var ts_key_enum_1 = require("ts-key-enum");
     } else if (Keyboard_1.keyboard.isKeyDown(ts_key_enum_1.Key.Shift)) {
       movement[1] = -2;
     }
+    if (Keyboard_1.keyboard.isKeyDown("q")) {
+      camera.yaw -= 20 * delta;
+    } else if (Keyboard_1.keyboard.isKeyDown("e")) {
+      camera.yaw += 20 * delta;
+    }
     movement = gl_matrix_1.vec3.normalize(movement, movement);
     camera.position = gl_matrix_1.vec3.add(gl_matrix_1.vec3.create(), camera.position, gl_matrix_1.vec3.multiply(gl_matrix_1.vec3.create(), movement, [delta, delta, delta]));
   }
@@ -9267,10 +9547,17 @@ var ts_key_enum_1 = require("ts-key-enum");
     indicesBuffer.delete();
     normalsBuffer.delete();
     texture.delete();
+    chunkShader.delete();
+    chunkRendering.forEach(function (chunkData) {
+      chunkData.vbo.delete();
+      chunkData.ebo.delete();
+      chunkData.vboNormals.delete();
+      exports.gl.deleteVertexArray(chunkData.vao);
+    });
     exports.gl.deleteVertexArray(vao);
   }
 })();
-},{"gl-matrix":"../node_modules/gl-matrix/esm/index.js","./BufferObject":"BufferObject.ts","./ShaderProgram":"ShaderProgram.ts","./MathUtilities":"MathUtilities.ts","./Camera":"Camera.ts","./Texture":"Texture.ts","./Keyboard":"Keyboard.ts","ts-key-enum":"../node_modules/ts-key-enum/dist/js/Key.enum.js"}],"../node_modules/parcel-bundler/src/builtins/hmr-runtime.js":[function(require,module,exports) {
+},{"gl-matrix":"../node_modules/gl-matrix/esm/index.js","./BufferObject":"BufferObject.ts","./ShaderProgram":"ShaderProgram.ts","./MathUtilities":"MathUtilities.ts","./Camera":"Camera.ts","./Texture":"Texture.ts","./Keyboard":"Keyboard.ts","ts-key-enum":"../node_modules/ts-key-enum/dist/js/Key.enum.js","./Chunk":"Chunk.ts","./MeshGenerator":"MeshGenerator.ts","./World":"World.ts"}],"../node_modules/parcel-bundler/src/builtins/hmr-runtime.js":[function(require,module,exports) {
 var global = arguments[3];
 var OVERLAY_ID = '__parcel__error__overlay__';
 var OldModule = module.bundle.Module;
@@ -9295,7 +9582,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "56930" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "57578" + '/');
   ws.onmessage = function (event) {
     checkedAssets = {};
     assetsToAccept = [];
