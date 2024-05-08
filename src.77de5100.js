@@ -9118,6 +9118,7 @@ var ts_key_enum_1 = require("ts-key-enum");
   }, 1000 / 60);
   addEventListener("close", clearData);
   var program = new ShaderProgram_1.ShaderProgram("resources/shaders/test.vs", "resources/shaders/test.fs");
+  var program2 = new ShaderProgram_1.ShaderProgram("resources/shaders/test.vs", "resources/shaders/light.fs");
   var verticesData = [
   // Front face
   -0.5, -0.5, 0.5, 0.5, -0.5, 0.5, 0.5, 0.5, 0.5, -0.5, 0.5, 0.5,
@@ -9200,25 +9201,43 @@ var ts_key_enum_1 = require("ts-key-enum");
     projectionMatrix = gl_matrix_1.mat4.create();
     projectionMatrix = gl_matrix_1.mat4.perspective(projectionMatrix, MathUtilities_1.toRadians(60), canvas.clientWidth / canvas.clientHeight, 0.1, 100);
     program.setMatrix4fv("projectionMatrix", projectionMatrix);
+    program2.setMatrix4fv("projectionMatrix", projectionMatrix);
   });
   var modelMatrix = gl_matrix_1.mat4.create();
   modelMatrix = gl_matrix_1.mat4.translate(modelMatrix, modelMatrix, [0, 0, -10]);
   modelMatrix = gl_matrix_1.mat4.scale(modelMatrix, modelMatrix, [5, 5, 5]);
   var camera = new Camera_1.Camera();
   program.setMatrix4fv("projectionMatrix", projectionMatrix);
+  program2.setMatrix4fv("projectionMatrix", projectionMatrix);
   program.setMatrix4fv("modelMatrix", modelMatrix);
-  program.setVec3("objectColor", [1, 1, 1]);
-  program.setVec3("lightColor", [1, 1, 1]);
+  var lightColor = gl_matrix_1.vec3.fromValues(1, 1, 1);
+  program.setVec3("objectColor", [1, .8, .3]);
+  program.setVec3("lightColor", lightColor);
+  program2.setVec3("lightColor", lightColor);
   program.setVec3("viewPos", camera.position);
   program.setVec3("lightPos", [5, 1, 2]);
   program.setFloat("specularStrength", 0.25);
   var delta = 60 / 1000;
+  var angle = 0;
+  var lightPos = gl_matrix_1.vec3.create();
   function run() {
     exports.gl.clear(exports.gl.COLOR_BUFFER_BIT | exports.gl.DEPTH_BUFFER_BIT);
     modelMatrix = gl_matrix_1.mat4.rotateY(modelMatrix, modelMatrix, MathUtilities_1.toRadians(5) * delta);
     program.setMatrix4fv("modelMatrix", modelMatrix);
     program.setMatrix4fv("viewMatrix", camera.viewMatrix);
+    program2.setMatrix4fv("viewMatrix", camera.viewMatrix);
+    angle += 5 * delta;
+    angle = angle % 360;
+    lightPos = [5 * Math.sin(MathUtilities_1.toRadians(angle)), 5 * Math.cos(MathUtilities_1.toRadians(angle)), 5 * Math.sin(MathUtilities_1.toRadians(angle / 2)) - 10];
+    program.setVec3("lightPos", lightPos);
     program.use();
+    exports.gl.bindVertexArray(vao);
+    indicesBuffer.bind();
+    exports.gl.drawElements(exports.gl.TRIANGLES, 36, exports.gl.UNSIGNED_INT, 0);
+    var lightPosModelMatrix = gl_matrix_1.mat4.create();
+    gl_matrix_1.mat4.translate(lightPosModelMatrix, lightPosModelMatrix, lightPos);
+    program2.setMatrix4fv("modelMatrix", lightPosModelMatrix);
+    program2.use();
     exports.gl.bindVertexArray(vao);
     indicesBuffer.bind();
     exports.gl.drawElements(exports.gl.TRIANGLES, 36, exports.gl.UNSIGNED_INT, 0);
@@ -9243,6 +9262,7 @@ var ts_key_enum_1 = require("ts-key-enum");
   }
   function clearData() {
     program.delete();
+    program2.delete();
     verticesBuffer.delete();
     indicesBuffer.delete();
     normalsBuffer.delete();
@@ -9275,7 +9295,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "56336" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "56930" + '/');
   ws.onmessage = function (event) {
     checkedAssets = {};
     assetsToAccept = [];
