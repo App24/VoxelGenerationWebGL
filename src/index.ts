@@ -26,6 +26,7 @@ export let gl: WebGL2RenderingContext;
     addEventListener("close", clearData);
 
     const program = new ShaderProgram("resources/shaders/test.vs", "resources/shaders/test.fs");
+    const program2 = new ShaderProgram("resources/shaders/test.vs", "resources/shaders/light.fs");
 
     const verticesData = [
         // Front face
@@ -183,53 +184,79 @@ export let gl: WebGL2RenderingContext;
         projectionMatrix = mat4.create();
         projectionMatrix = mat4.perspective(projectionMatrix, toRadians(60), canvas.clientWidth / canvas.clientHeight, 0.1, 100);
         program.setMatrix4fv("projectionMatrix", projectionMatrix);
+        program2.setMatrix4fv("projectionMatrix", projectionMatrix);
     });
 
     let modelMatrix = mat4.create();
     modelMatrix = mat4.translate(modelMatrix, modelMatrix, [0, 0, -10]);
-    modelMatrix = mat4.scale(modelMatrix, modelMatrix, [5,5,5]);
+    modelMatrix = mat4.scale(modelMatrix, modelMatrix, [5, 5, 5]);
 
     const camera = new Camera();
 
     program.setMatrix4fv("projectionMatrix", projectionMatrix);
+    program2.setMatrix4fv("projectionMatrix", projectionMatrix);
     program.setMatrix4fv("modelMatrix", modelMatrix);
 
-    program.setVec3("objectColor", [1, 1, 1]);
-    program.setVec3("lightColor", [1, 1, 1]);
+    const lightColor = vec3.fromValues(1, 1, 1);
+
+    program.setVec3("objectColor", [1, .8, .3]);
+    program.setVec3("lightColor", lightColor);
+    program2.setVec3("lightColor", lightColor);
     program.setVec3("viewPos", camera.position);
     program.setVec3("lightPos", [5, 1, 2]);
 
     program.setFloat("specularStrength", 0.25);
     const delta = 60 / 1000;
 
+    let angle = 0;
+
+    let lightPos = vec3.create();
+
     function run() {
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         modelMatrix = mat4.rotateY(modelMatrix, modelMatrix, toRadians(5) * delta);
         program.setMatrix4fv("modelMatrix", modelMatrix);
         program.setMatrix4fv("viewMatrix", camera.viewMatrix);
+        program2.setMatrix4fv("viewMatrix", camera.viewMatrix);
+
+        angle += 5 * delta;
+
+        angle = angle % 360;
+
+        lightPos = [5 * Math.sin(toRadians(angle)), 5 * Math.cos(toRadians(angle)), 5 * Math.sin(toRadians(angle / 2)) - 10];
+
+        program.setVec3("lightPos", lightPos);
 
         program.use();
         gl.bindVertexArray(vao);
         indicesBuffer.bind();
         gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_INT, 0);
 
-        let movement:vec3 = vec3.create();
+        const lightPosModelMatrix = mat4.create();
+        mat4.translate(lightPosModelMatrix, lightPosModelMatrix, lightPos);
+        program2.setMatrix4fv("modelMatrix", lightPosModelMatrix);
+        program2.use();
+        gl.bindVertexArray(vao);
+        indicesBuffer.bind();
+        gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_INT, 0);
 
-        if(keyboard.isKeyDown("w")){
+        let movement: vec3 = vec3.create();
+
+        if (keyboard.isKeyDown("w")) {
             movement[2] = -2;
-        }else if(keyboard.isKeyDown("s")){
+        } else if (keyboard.isKeyDown("s")) {
             movement[2] = 2;
         }
 
-        if(keyboard.isKeyDown("a")){
+        if (keyboard.isKeyDown("a")) {
             movement[0] = -2;
-        }else if(keyboard.isKeyDown("d")){
+        } else if (keyboard.isKeyDown("d")) {
             movement[0] = 2;
         }
 
-        if(keyboard.isKeyDown(" ")){
+        if (keyboard.isKeyDown(" ")) {
             movement[1] = 2;
-        }else if(keyboard.isKeyDown(Key.Shift)){
+        } else if (keyboard.isKeyDown(Key.Shift)) {
             movement[1] = -2;
         }
 
@@ -239,6 +266,7 @@ export let gl: WebGL2RenderingContext;
 
     function clearData() {
         program.delete();
+        program2.delete();
         verticesBuffer.delete();
         indicesBuffer.delete();
         normalsBuffer.delete();
