@@ -45,6 +45,18 @@ export class Camera {
         this.recreateMatrix = true;
     }
 
+    public get positionX(){
+        return this._position[0];
+    }
+
+    public get positionY(){
+        return this._position[1];
+    }
+
+    public get positionZ(){
+        return this._position[2];
+    }
+
     public set positionX(value: number) {
         this._position[0] = value;
         this.recreateMatrix = true;
@@ -68,5 +80,13 @@ export class Camera {
     public set pitch(value: number) {
         this._pitch = value;
         this.recreateMatrix = true;
+    }
+
+    public get yaw() {
+        return this._yaw;
+    }
+
+    public get pitch() {
+        return this._pitch;
     }
 }
