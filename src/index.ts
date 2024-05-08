@@ -1,4 +1,4 @@
-import { mat4 } from "gl-matrix";
+import { mat4, vec3 } from "gl-matrix";
 import { BufferObject } from "./BufferObject";
 import { ShaderProgram } from "./ShaderProgram";
 import { toRadians } from "./MathUtilities";
@@ -213,23 +213,28 @@ export let gl: WebGL2RenderingContext;
         indicesBuffer.bind();
         gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_INT, 0);
 
+        let movement:vec3 = vec3.create();
+
         if(keyboard.isKeyDown("w")){
-            camera.positionZ -= 2 * delta;
+            movement[2] = -2;
         }else if(keyboard.isKeyDown("s")){
-            camera.positionZ += 2 * delta;
+            movement[2] = 2;
         }
 
         if(keyboard.isKeyDown("a")){
-            camera.positionX -= 2 * delta;
+            movement[0] = -2;
         }else if(keyboard.isKeyDown("d")){
-            camera.positionX += 2 * delta;
+            movement[0] = 2;
         }
 
         if(keyboard.isKeyDown(" ")){
-            camera.positionY += 2 * delta;
+            movement[1] = 2;
         }else if(keyboard.isKeyDown(Key.Shift)){
-            camera.positionY -= 2 * delta;
+            movement[1] = -2;
         }
+
+        movement = vec3.normalize(movement, movement);
+        camera.position = vec3.add(vec3.create(), camera.position, vec3.multiply(vec3.create(), movement, [delta, delta, delta]));
     }
 
     function clearData() {

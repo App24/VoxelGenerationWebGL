@@ -20,14 +20,12 @@ export class Camera {
     private recreateViewMatrix() {
         this.recreateMatrix = false;
         this._viewMatrix = mat4.create();
-        let direction = vec3.create();
+        const direction = vec3.create();
         direction[0] = Math.cos(toRadians(this._yaw)) * Math.cos(toRadians(this._pitch));
         direction[1] = Math.sin(toRadians(this._pitch));
         direction[2] = Math.sin(toRadians(this._yaw)) * Math.cos(toRadians(this._pitch));
-        direction = vec3.normalize(direction, direction);
-        let temp = vec3.create();
-        temp = vec3.add(temp, this._position, direction);
-        this._viewMatrix = mat4.lookAt(this._viewMatrix, this._position, temp, [0, 1, 0]);
+        vec3.normalize(direction, direction);
+        mat4.lookAt(this._viewMatrix, this._position, vec3.add(vec3.create(), this._position, direction), [0, 1, 0]);
     }
 
     public get viewMatrix() {
@@ -36,7 +34,7 @@ export class Camera {
         return this._viewMatrix;
     }
 
-    public get position(): ReadonlyVec3 {
+    public get position():ReadonlyVec3 {
         return this._position;
     }
 
